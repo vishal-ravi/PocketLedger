@@ -1,0 +1,296 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentMethod {
+  UPI
+  CREDIT_CARD
+  CASH
+  DEBIT_CARD
+  BANK_TRANSFER
+}
+
+enum RecurringInterval {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum ExpenseType {
+  NEED
+  WANT
+  INCOME
+}
+
+enum SplitStatus {
+  PENDING
+  SETTLED
+}
+
+enum HouseholdRole {
+  OWNER
+  MEMBER
+}
+
+model Household {
+  id         String            @id @default(uuid())
+  name       String
+  inviteCode String            @unique
+  createdAt  DateTime          @default(now())
+  members    HouseholdMember[]
+}
+
+model HouseholdMember {
+  id          String        @id @default(uuid())
+  householdId String
+  userId      String
+  role        HouseholdRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+  household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, userId])
+  @@index([userId])
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  fullName       String
+  passwordHash   String?
+  currencySymbol String   @default("₹")
+  monthlyIncome  Decimal   @default(0) @db.Decimal(14, 2)
+  budgetRollover Boolean   @default(false)
+  tokenVersion   Int      @default(0)
+  totpSecret     String?
+  totpEnabled    Boolean  @default(false)
+  backupCodes    String?
+  createdAt      DateTime  @default(now())
+  categories     Category[]
+  accounts       Account[]
+  expenses       Expense[]
+  creditCards    CreditCard[]
+  goals          Goal[]
+  loans          Loan[]
+  recurring      RecurringRule[]
+  repayments     DebtRepayment[]
+  authTokens     AuthToken[]
+  memberships    HouseholdMember[]
+}
+
+enum AuthTokenType {
+  RESET_PASSWORD
+}
+
+model AuthToken {
+  id        String        @id @default(uuid())
+  userId    String?
+  email     String
+  type      AuthTokenType
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+  user      User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, type, expiresAt])
+  @@index([tokenHash])
+}
+
+model Category {
+  id            String    @id @default(uuid())
+  userId        String
+  name          String
+  monthlyBudget Decimal   @default(0) @db.Decimal(14, 2)
+  colorCode     String    @default("#6366f1")
+  taxDeductible Boolean   @default(false)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses      Expense[]
+  recurring     RecurringRule[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model CreditCard {
+  id                     String    @id @default(uuid())
+  userId                 String
+  cardName               String
+  creditLimit            Decimal   @db.Decimal(14, 2)
+  statementGenerationDay Int
+  dueDay                 Int
+  apr                    Decimal?  @db.Decimal(5, 2)
+  rewardsRate            Decimal?  @db.Decimal(5, 2)
+  notes                  String?
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses               Expense[]
+  loans                  Loan[]
+  recurring              RecurringRule[]
+
+  @@index([userId])
+}
+
+enum AccountType {
+  BANK
+  CASH
+  WALLET
+  INVESTMENT
+  OTHER
+}
+
+model Account {
+  id        String      @id @default(uuid())
+  userId    String
+  name      String
+  type      AccountType @default(BANK)
+  balance   Decimal     @db.Decimal(14, 2)
+  createdAt DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model RecurringRule {
+  id            String            @id @default(uuid())
+  userId        String
+  description   String
+  amount        Decimal           @db.Decimal(14, 2)
+  type          ExpenseType       @default(NEED)
+  categoryId    String?
+  paymentMethod PaymentMethod     @default(UPI)
+  creditCardId  String?
+  interval      RecurringInterval @default(MONTHLY)
+  startDate     DateTime
+  nextDueDate   DateTime
+  endDate       DateTime?
+  autoPost      Boolean           @default(true)
+  paused        Boolean           @default(false)
+  remindedAt    DateTime?
+  notes         String?
+  createdAt     DateTime          @default(now())
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  creditCard    CreditCard?       @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
+
+  @@index([userId, nextDueDate])
+}
+
+model Expense {
+  id            String        @id @default(uuid())
+  userId        String
+  date          DateTime
+  categoryId    String?
+  description   String
+  paymentMethod PaymentMethod
+  creditCardId  String?
+  amount        Decimal       @db.Decimal(14, 2)
+  type          ExpenseType
+  notes         String?
+  isSplit       Boolean       @default(false)
+  whoPaid       String        @default("Me")
+  myShare       Decimal       @default(0) @db.Decimal(14, 2)
+  originalAmount   Decimal?      @db.Decimal(14, 2)
+  originalCurrency String?
+  fxRate           Decimal?      @db.Decimal(12, 6)
+  createdAt     DateTime      @default(now())
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category?     @relation(fields: [categoryId], references: [id])
+  creditCard    CreditCard?   @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
+  splitDetails  SplitDetail[]
+
+  @@index([userId, date])
+}
+
+model Goal {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String
+  targetAmount Decimal  @db.Decimal(14, 2)
+  savedAmount  Decimal  @default(0) @db.Decimal(14, 2)
+  targetDate   DateTime?
+  colorCode    String   @default("#10b981")
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SplitDetail {
+  id             String      @id @default(uuid())
+  expenseId      String
+  personName     String
+  amountOwedToMe Decimal     @default(0) @db.Decimal(14, 2)
+  amountIOwe     Decimal     @default(0) @db.Decimal(14, 2)
+  owedToPerson   String?
+  status         SplitStatus @default(PENDING)
+  repaymentDate  DateTime?
+  expense        Expense     @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId, status])
+}
+
+enum InstallmentStatus {
+  DUE
+  PAID
+}
+
+enum RepayDirection {
+  I_OWE
+  OWED_TO_ME
+}
+
+model Loan {
+  id            String            @id @default(uuid())
+  userId        String
+  lenderName    String
+  principal     Decimal           @db.Decimal(14, 2)
+  annualRate    Decimal           @default(0) @db.Decimal(5, 2)
+  tenureMonths  Int
+  emiAmount     Decimal           @db.Decimal(14, 2)
+  startDate     DateTime
+  categoryId    String?
+  creditCardId  String?
+  paymentMethod PaymentMethod     @default(UPI)
+  notes         String?
+  createdAt     DateTime          @default(now())
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creditCard    CreditCard?       @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
+  installments  LoanInstallment[]
+
+  @@index([userId])
+}
+
+model LoanInstallment {
+  id        String             @id @default(uuid())
+  loanId    String
+  number    Int
+  dueDate   DateTime
+  amount    Decimal            @db.Decimal(14, 2)
+  paidDate  DateTime?
+  expenseId String?
+  status    InstallmentStatus  @default(DUE)
+  loan      Loan               @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@unique([loanId, number])
+  @@index([loanId, dueDate])
+}
+
+model DebtRepayment {
+  id         String          @id @default(uuid())
+  userId     String
+  personName String
+  direction  RepayDirection
+  amount     Decimal         @db.Decimal(14, 2)
+  date       DateTime
+  note       String?
+  expenseId  String?
+  createdAt  DateTime        @default(now())
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}

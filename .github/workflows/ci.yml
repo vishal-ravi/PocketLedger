@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    name: Lint, types, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx eslint .
+      - run: npx tsc --noEmit
+      - run: npm run test:unit
+      - run: npx prisma validate
+      - run: npx next build
+        env:
+          AUTH_SECRET: ci-only-secret-not-used-at-runtime-0123456789abcdef
+
+  e2e:
+    name: Browser QA (Postgres + Chrome)
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres@localhost:5432/postgres?schema=public
+      AUTH_SECRET: ci-only-secret-not-used-at-runtime-0123456789abcdef
+      COOKIE_SECURE: "0"
+      APP_URL: http://localhost:3000
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma migrate deploy
+      - run: npm run db:seed
+      - run: npm run db:demo-history
+      - run: npx next build
+      - run: npx next start -p 3000 &
+      - name: Wait for server
+        run: npx --yes wait-on http://localhost:3000/login --timeout 60000
+      - run: npm run test:qa
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+
+  docker:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t pocketledger:ci .

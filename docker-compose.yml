@@ -1,0 +1,58 @@
+# Shared environment for the app (and the one-off seed service).
+# DATABASE_URL points at the `db` service inside this compose network.
+x-app-env: &app-env
+  DATABASE_URL: "postgresql://postgres:${POSTGRES_PASSWORD:-change-me}@db:5432/postgres?schema=public"
+  AUTH_SECRET: "${AUTH_SECRET:?Set AUTH_SECRET in .env - generate with openssl rand -hex 32}"
+  APP_URL: "${APP_URL:-http://localhost:3000}"
+  # Cookies are Secure by default in the image (NODE_ENV=production).
+  # Keep 0 while you serve plain http on your LAN; set 1 behind an HTTPS reverse proxy.
+  COOKIE_SECURE: "${COOKIE_SECURE:-0}"
+  LOG_LEVEL: "${LOG_LEVEL:-info}"
+  MAIL_TRANSPORT: "${MAIL_TRANSPORT:-file}"
+
+services:
+  app:
+    build: .
+    image: pocketledger:latest
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment: *app-env
+    volumes:
+      # file-mail outbox lands here: logs/mail/outbox.log on the host
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # first-run sample data:  docker compose run --rm seed
+  seed:
+    profiles: ["tools"]
+    build: .
+    image: pocketledger:latest
+    environment:
+      <<: *app-env
+      ALLOW_SEED: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["tsx", "prisma/seed.ts"]
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-me}"
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # not published to the host — only the app container can reach it
+    restart: unless-stopped
+
+volumes:
+  pgdata:

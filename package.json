@@ -1,0 +1,70 @@
+{
+  "name": "pocketledger",
+  "version": "1.0.0",
+  "description": "Self-hosted personal finance tracker — expenses, budgets, insights, credit cards, EMIs and shared households.",
+  "license": "Apache-2.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vishal-ravi/PocketLedger.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vishal-ravi/PocketLedger/issues"
+  },
+  "homepage": "https://github.com/vishal-ravi/PocketLedger#readme",
+  "keywords": [
+    "personal-finance",
+    "expense-tracker",
+    "budget",
+    "self-hosted",
+    "nextjs",
+    "prisma",
+    "postgresql"
+  ],
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test:qa": "node qa.mjs",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:demo-history": "tsx prisma/seed-history.ts",
+    "db:clear-demo-history": "tsx prisma/seed-history.ts --clear",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:backup": "tsx scripts/backup.ts",
+    "db:restore": "tsx scripts/restore.ts",
+    "test:unit": "node --import tsx --test tests/*.test.ts",
+    "test": "npm run test:unit && npm run test:qa"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.15.0",
+    "jose": "^6.2.12",
+    "lucide-react": "^0.468.0",
+    "next": "^15.5.0",
+    "nodemailer": "^10.0.13",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "recharts": "^3.2.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.10.0",
+    "@types/nodemailer": "^8.0.2",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.8",
+    "postcss": "^8.5.0",
+    "prisma": "^6.15.0",
+    "puppeteer-core": "^25.12.0",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

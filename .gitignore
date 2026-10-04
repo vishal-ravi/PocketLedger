@@ -1,0 +1,21 @@
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# secrets & local env
+.env
+.env.local
+.env.*.local
+
+# runtime output
+logs/
+backups/
+*.log
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/
